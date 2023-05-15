@@ -2,6 +2,8 @@
 import requests
 import json
 import os
+from datetime import date
+from datetime import timedelta
 
 class SetmoreAuth:
 	"""
@@ -110,7 +112,7 @@ class SetmoreServices:
 	def __init__(self, auth):
 		self.auth = auth
 
-	def get_services(self, save=False, file=None):
+	def get_services_all(self, save=False, file=None):
 		headers = {
 			'Content-Type': 'application/json',
 			'Authorization': f'Bearer {self.auth.access_token}'
@@ -190,30 +192,95 @@ class SetmoreTimeSlots:
 	def __init__(self, auth):
 		self.auth = auth
 
-	def get_all_available_time_slots(self, staff_key=None, service_key=None, selected_date=None, off_hours=False, double_booking=False, slot_limit=None, timezone=None):
+	def add_minutes(time_str, minutes):
+		hour, minute = map(int, time_str.split('.'))
+		total_minutes = hour * 60 + minute + minutes
+		new_hour = total_minutes // 60
+		new_minute = total_minutes % 60
+		return f"{new_hour:02d}.{new_minute:02d}"
+
+	def convert_time_slots_to_ranges(time_slots, service_duration):
+		ranges = []
+		for i in range(len(time_slots) - 1):
+			start_time = time_slots[i]
+			end_time = time_slots[i + 1]
+			range_start = start_time
+			range_end = SetmoreTimeSlots.add_minutes(start_time, service_duration)
+			range_str = f"{range_start} - {range_end}"
+			ranges.append(range_str)
+		return ranges
+
+
+
+	def get_all_available_time_slots(self, service_name=None, staff_key=None, service_key=None, selected_date=None, off_hours=False, double_booking=False, slot_limit=None, timezone=None, interval=30):
+		"""
+		Get all available time slots for the given service, staff, and date.
+
+		:param service_name (required, str): The name of the service. Default is to None. (optional if service_key is provided)
+		:param staff_key (optional, str): The key of the staff_key of the given staff_member. Default is to pull the first staff_key from the services.json file if it exists.
+		:param service_key (optional, str): The key of the service. Default is None. Required if service_name is not provided
+		:param selected_date ("DD/MM/YYYY", optional): The selected date in "DD/MM/YYYY" format. Default is today's date.
+		:param off_hours (optional, bool): A boolean indicating whether to include off-hours slots. Default is False.
+		:param double_booking (optional, bool): A boolean indicating whether to allow double booking. Default is False.
+		:param slot_limit (optional, int): The maximum number of slots to retrieve. Default is None.
+		:param timezone: The timezone for the slots. Default is None.
+
+		:return: A list of available time slots.
+		"""
 		headers = {
 			'Content-Type': 'application/json',
 			'Authorization': f'Bearer {self.auth.access_token}'
 		}
+		if os.path.isfile('credentials/services.json'):
+			with open("credentials/services.json") as file:
+				data = json.load(file)
+				if staff_key is None:
+					for service in data:
+						if service["service_name"] == service_name:
+							staff_key = service["staff_keys"][0]
+							break
+				if service_key is None:
+					for service in data:
+						if service["service_name"] == service_name:
+							service_key = service["key"]
+							service_duration = service["duration"]
+							break
+		if service_key is None and service_name is None:
+			error = 'Either service_key or service_name must be provided'
+			raise Exception(error)
+		if selected_date is None:
+			selected_date = date.today().strftime("%d/%m/%Y")
 
 		payload = {
-			'staff_key': staff_key,
-			'service_key': service_key,
-			'selected_date': selected_date,
-			'off_hours': off_hours,
-			'double_booking': double_booking,
-			'slot_limit': slot_limit,
-			'timezone': timezone
+			key: value
+			for key, value in {
+				"staff_key": staff_key,
+				"service_key": service_key,
+				"selected_date": selected_date,
+				"off_hours": off_hours,
+				"double_booking": double_booking,
+				"slot_limit": slot_limit,
+				"timezone": timezone
+			}.items()
+			if value is not None
 		}
 
 		try:
 			response = requests.post('https://developer.setmore.com/api/v1/bookingapi/slots', headers=headers, json=payload)
 			response.raise_for_status()
 			data = response.json()
-			slots = data.get('data', [])
-			return slots
+			time_slots = data['data'].get('slots')
+			
+			if time_slots is not None:
+				adjusted_time_slots = [slot for slot in time_slots if slot.endswith('.00') or slot.endswith('.30')]
+				ranges = SetmoreTimeSlots.convert_time_slots_to_ranges(adjusted_time_slots, service_duration)
+				return ranges
+			else:
+				print("Slots data not found.")
+
 		except requests.exceptions.RequestException as e:
 			print(f'Request failed: {e}')
+
 		except KeyError as e:
 			print(f'Invalid response format: {e}')
 
