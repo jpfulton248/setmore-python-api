@@ -1,4 +1,4 @@
-# __init__.py
-from .setmoreapi import SetmoreApi
+#__init__.py
+from .setmoreapi import SetmoreAuth, SetmoreServices, SetmoreStaff, SetmoreTimeSlots, SetmoreCustomers, SetmoreAppointments
 
-__all__ = ['SetmoreApi']
+__all__ = ['SetmoreAuth', 'SetmoreServices', 'SetmoreStaff', 'SetmoreTimeSlots', 'SetmoreCustomers', 'SetmoreAppointments']
