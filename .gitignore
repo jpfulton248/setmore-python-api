@@ -4,3 +4,4 @@ DS_STORE
 app.py
 credentials/
 /credentials
+.env
