@@ -1,22 +1,23 @@
 import requests
 import json
 import os
+import datetime
 
-class SetmoreApi:
+class SetmoreAuth:
+	"""
+	Initializes SetmoreAuth with necessary tokens
+
+	:param refresh_token_file: (optional) Defaults to refresh_token.json
+	:param access_token_file: (optional) Defaults to access_token.json
+	:param token_file_path: (optional) Location for token json files. Defaults to directory 'credentials' as a subdirectory of current directory.
+	"""
 	def __init__(self, refresh_token_file='refresh_token.json', access_token_file='access_token.json', token_file_path='credentials'):
-		"""
-		Initializes SetmoreApi with necessary tokens
-
-		:param refresh_token_file: (optional) Defaults to refresh_token.json
-		:param access_token_file: (optional) Defaults to access_token.json
-		:param token_file_path: (optional) Location for token json files. Defaults to directory 'credentials' as a subdirectory of current directory.
-		"""
 		self.refresh_token_file = os.path.join(token_file_path, refresh_token_file)
 		self.access_token_file = os.path.join(token_file_path, access_token_file)
 		self.refresh_token = None
 		self.access_token = None
 		self.token_path = None
-	
+
 		try:
 			self.load_access_token()
 		except FileNotFoundError:
@@ -95,57 +96,3 @@ class SetmoreApi:
 		except requests.exceptions.RequestException as e:
 			# Request exception occurred
 			raise Exception(f'Request exception occurred: {str(e)}')
-
-
-	def get_slots(self, staff_key=None, service_key=None, selected_date=None, off_hours=False, double_booking=False, slot_limit=None, timezone=None):
-		self.verify_token()
-
-		headers = {
-			'Content-Type': 'application/json',
-			'Authorization': f'Bearer {self.access_token}'
-		}
-
-		payload = {
-			'staff_key': staff_key,
-			'service_key': service_key,
-			'selected_date': selected_date,
-			'off_hours': off_hours,
-			'double_booking': double_booking,
-			'slot_limit': slot_limit,
-			'timezone': timezone
-		}
-
-		response = requests.post('https://developer.setmore.com/api/v1/bookingapi/slots', headers=headers, json=payload)
-		data = response.json()
-
-		if response.status_code == 200:
-			if 'data' in data and isinstance(data['data'], list):
-				slots = data['data']
-				if len(slots) == 0:
-					return 'No available time slots for the given date range'
-				else:
-					return slots
-			else:
-				raise ValueError('Invalid response format')
-		else:
-			error_message = f'Request failed with status code {response.status_code}: {response.text}'
-			raise ValueError(error_message)
-
-		
-	def get_services(self):
-		self.verify_token()
-
-		headers = {
-			'Content-Type': 'application/json',
-			'Authorization': f'Bearer {self.access_token}'
-		}
-
-		services_response = requests.get('https://developer.setmore.com/api/v1/bookingapi/services', headers=headers)
-		data = services_response.json()
-
-		if services_response.status_code == 200:
-			services = data['data']['services']
-			return services
-		else:
-			print(f'Request failed with status code {services_response.status_code}: {services_response.text}')
-			exit
