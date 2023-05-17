@@ -56,7 +56,6 @@ class SetmoreAuth:
 				self.save_access_token(data)
 			except Exception as e:
 				raise Exception(f'Access token generation successful, but saving failed: {str(e)}')
-			exit
 		else:
 			raise Exception(f'Access token generation failed with status code: {response.status_code}\n{response.text}')
 
@@ -77,17 +76,12 @@ class SetmoreAuth:
 
 			if services_response.status_code == 200:
 				# Success: Access token is valid
-				exit
+				return None
 
-			elif services_response.status_code == 401 and data.get('response', False) is False:
-				# Unauthorized: Access token expired or invalid
-				msg_value = data.get('msg', '')
-
-				if 'access token either invalid / expired' in msg_value:
-					# Request failed. Get a new access token
+			elif services_response.status_code == 401:
+				try:
 					self.generate_access_token()
-
-				else:
+				except:
 					# Request failed for some other reason
 					raise Exception(f'Request failed for a different reason with status code: {services_response.status_code} and text: {services_response.text}')
 
@@ -192,27 +186,7 @@ class SetmoreTimeSlots:
 	def __init__(self, auth):
 		self.auth = auth
 
-	def add_minutes(time_str, minutes):
-		hour, minute = map(int, time_str.split('.'))
-		total_minutes = hour * 60 + minute + minutes
-		new_hour = total_minutes // 60
-		new_minute = total_minutes % 60
-		return f"{new_hour:02d}.{new_minute:02d}"
-
-	def convert_time_slots_to_ranges(time_slots, service_duration):
-		ranges = []
-		for i in range(len(time_slots) - 1):
-			start_time = time_slots[i]
-			end_time = time_slots[i + 1]
-			range_start = start_time
-			range_end = SetmoreTimeSlots.add_minutes(start_time, service_duration)
-			range_str = f"{range_start} - {range_end}"
-			ranges.append(range_str)
-		return ranges
-
-
-
-	def get_all_available_time_slots(self, service_name=None, staff_key=None, service_key=None, selected_date=None, off_hours=False, double_booking=False, slot_limit=None, timezone=None, interval=30):
+	def get_all_available_time_slots(self, service_name=None, staff_key=None, service_key=None, selected_date=None, off_hours=False, double_booking=False, slot_limit=None, timezone=None):
 		"""
 		Get all available time slots for the given service, staff, and date.
 
@@ -272,58 +246,88 @@ class SetmoreTimeSlots:
 			time_slots = data['data'].get('slots')
 			
 			if time_slots is not None:
-				adjusted_time_slots = [slot for slot in time_slots if slot.endswith('.00') or slot.endswith('.30')]
-				ranges = SetmoreTimeSlots.convert_time_slots_to_ranges(adjusted_time_slots, service_duration)
-				return ranges
-			else:
-				print("Slots data not found.")
+				return time_slots
 
 		except requests.exceptions.RequestException as e:
 			print(f'Request failed: {e}')
 
-		except KeyError as e:
-			print(f'Invalid response format: {e}')
-
 		return None
 	
+import requests
+
 class SetmoreCustomers:
 	def __init__(self, auth):
 		self.auth = auth
 
 	def create_customer(self, customer_data):
+		"""
+		Create a customer in Setmore.
+
+		:param customer_data: A dictionary containing customer data.
+			Required fields:
+				- first_name (str): The customer's first name.
+			Optional fields:
+				- last_name (str): The customer's last name.
+				- email_id (str): The customer's email address.
+				- country_code (str): The customer's country code.
+				- cell_phone (str): The customer's cell phone number.
+				- work_phone (str): The customer's work phone number.
+				- home_phone (str): The customer's home phone number.
+				- address (str): The customer's address.
+				- city (str): The customer's city.
+				- state (str): The customer's state.
+				- postal_code (str): The customer's postal code.
+				- image_url (str): The URL of the customer's image.
+				- comment (str): Additional comment about the customer.
+				- additional_fields (dict): Additional custom fields.
+		:return: The customer ID if creation is successful, None otherwise.
+		"""
 		headers = {
 			'Content-Type': 'application/json',
 			'Authorization': f'Bearer {self.auth.access_token}'
 		}
 
 		try:
-			response = requests.post('https://developer.setmore.com/api/v1/bookingapi/customer', headers=headers, json=customer_data)
+			response = requests.post('https://developer.setmore.com/api/v1/bookingapi/customer/create', headers=headers, json=customer_data)
 			response.raise_for_status()
 			data = response.json()
-			customer_id = data.get('data', {}).get('customer_id')
+			customer_id = data.get('data', {}).get('customer', {}).get('key')
 			return customer_id
 		except requests.exceptions.RequestException as e:
 			print(f'Request failed: {e}')
 		
 		return None
 
-	def get_customer_details(self, customer_id):
+	def get_customer_details(self, firstname=None, email=None, phone=None):
+		"""
+		Retrieve customer details from Setmore.
+
+		:param firstname: The customer's first name (required).
+		:param email: The customer's email address.
+		:param phone: The customer's phone number.
+		:return: A list of customer details if retrieval is successful, None otherwise.
+		"""
 		headers = {
 			'Content-Type': 'application/json',
 			'Authorization': f'Bearer {self.auth.access_token}'
 		}
+		
+		params = {
+			'firstname': firstname,
+			'email': email,
+			'phone': phone
+		}
 
 		try:
-			response = requests.get(f'https://developer.setmore.com/api/v1/bookingapi/customer/{customer_id}', headers=headers)
+			response = requests.get('https://developer.setmore.com/api/v1/bookingapi/customer', headers=headers, params=params)
 			response.raise_for_status()
 			data = response.json()
-			customer_details = data.get('data')
+			customer_details = data.get('data', {}).get('customer')
 			return customer_details
 		except requests.exceptions.RequestException as e:
 			print(f'Request failed: {e}')
-		
-		return None
 
+		return None
 
 class SetmoreAppointments:
 	def __init__(self, auth):
