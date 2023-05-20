@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [metadata]
 name = "setmore-python-api"
-version = "0.4.9"
+version = "1.0.0"
 author = "Peter Fulton"
 author_email = "jpfulton248@gmail.com"
 description = "A description of your project"
