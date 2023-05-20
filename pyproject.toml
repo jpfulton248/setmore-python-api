@@ -34,10 +34,6 @@ authors = [
 Homepage = "https://github.com/jpfulton248/setmore-python-api"
 Bug Reports = "https://github.com/jpfulton248/setmore-python-api/issues"
 
-[project.optional-dependencies]
-
-[tool.setuptools]
-
 [build-system]
 requires = ["setuptools>=43.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
