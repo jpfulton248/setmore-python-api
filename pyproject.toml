@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[metadata]
+name = "setmore-python-api"
+version = "0.4.9"
+author = "Peter Fulton"
+author_email = "jpfulton248@gmail.com"
+description = "A description of your project"
+url = "https://github.com/jpfulton248/setmore-python-api"
+
+[options]
+packages = find:
+install_requires = [
+    "requests",
+    "json",
+    "datetime",
+]
