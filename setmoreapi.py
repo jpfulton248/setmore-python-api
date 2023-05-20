@@ -2,8 +2,7 @@
 import requests
 import json
 import os
-from datetime import date
-from datetime import timedelta
+from datetime import date, timedelta, datetime
 
 class SetmoreAuth:
 	"""
@@ -27,6 +26,26 @@ class SetmoreAuth:
 
 		self.verify_token()
 
+	def save_access_token(self, data):
+		try:
+			with open(self.access_token_file, 'w') as file:
+				json.dump(data, file)
+		except FileNotFoundError:
+			os.error("Error on write access_token_file. File or file path not found")
+
+	def generate_access_token(self):
+		response = requests.get(f'https://developer.setmore.com/api/v1/o/oauth2/token?refreshToken={self.refresh_token}')
+
+		if response.status_code == 200:
+			data = response.json()
+			try:
+				self.save_access_token(data)
+				self.load_access_token()
+			except Exception as e:
+				raise Exception(f'Access token generation successful, but saving failed: {str(e)}')
+		else:
+			raise Exception(f'Access token generation failed with status code: {response.status_code}\n{response.text}')
+
 	def load_token(self, token_file, token_key):
 		with open(token_file, 'r') as file:
 			data = json.load(file)
@@ -41,58 +60,29 @@ class SetmoreAuth:
 		except FileNotFoundError:
 			self.access_token = None
 
-	def save_access_token(self, data):
-		try:
-			with open(self.access_token_file, 'w') as file:
-				json.dump(data, file)
-		except FileNotFoundError:
-			self.generate_access_token()
-
-	def generate_access_token(self):
-		response = requests.get(f'https://developer.setmore.com/api/v1/o/oauth2/token?refreshToken={self.refresh_token}')
-		if response.status_code == 200:
-			data = response.json()
-			try:
-				self.save_access_token(data)
-			except Exception as e:
-				raise Exception(f'Access token generation successful, but saving failed: {str(e)}')
-		else:
-			raise Exception(f'Access token generation failed with status code: {response.status_code}\n{response.text}')
-
 	def verify_token(self):
-		try:
-			self.load_refresh_token()
+		self.load_refresh_token()
 
-			if self.access_token is None:
+		if self.access_token is None:
+			self.generate_access_token()
+			self.access_token = self.load_access_token()
+			return self.access_token
+
+		headers = {
+			'Content-Type': 'application/json',
+			'Authorization': f'Bearer {self.access_token}'
+		}
+
+		services_response = requests.get('https://developer.setmore.com/api/v1/bookingapi/services', headers=headers)
+
+		if services_response.status_code == 200:
+			# Success: Access token is valid
+			return None
+
+		elif services_response.status_code == 401:
 				self.generate_access_token()
-
-			headers = {
-				'Content-Type': 'application/json',
-				'Authorization': f'Bearer {self.access_token}'
-			}
-
-			services_response = requests.get('https://developer.setmore.com/api/v1/bookingapi/services', headers=headers)
-			data = services_response.json()
-
-			if services_response.status_code == 200:
-				# Success: Access token is valid
-				return None
-
-			elif services_response.status_code == 401:
-				try:
-					self.generate_access_token()
-				except:
-					# Request failed for some other reason
-					raise Exception(f'Request failed for a different reason with status code: {services_response.status_code} and text: {services_response.text}')
-
-			else:
-				# Request failed: Unknown error
-				raise Exception(f'Testing auth key failed entirely')
-
-		except requests.exceptions.RequestException as e:
-			# Request exception occurred
-			raise Exception(f'Request exception occurred: {str(e)}')
-
+		else:
+			services_response.raise_for_status()
 class Setmore:
 	def __init__(self, auth):
 		self.auth = auth
@@ -101,11 +91,42 @@ class Setmore:
 		self.timeslots = SetmoreTimeSlots(self.auth)
 		self.customers = SetmoreCustomers(self.auth)
 		self.appointments = SetmoreAppointments(self.auth)
-
 class SetmoreServices:
 	def __init__(self, auth):
 		self.auth = auth
+		self.make_request
 
+	def make_request(self, url, headers, method, json=None):
+		""" Make a request
+		``url (required, str)`` url
+		``headers (required, str)`` headers in a json string
+		``method (required, str)`` get or post
+		``payload (optional, str)`` payload in a json string
+		"""
+		# Depending on the HTTP method (get, post, etc.), we may need to handle data differently.
+		if method.lower() == 'get':
+			request_func = requests.get
+		elif method.lower() == 'post':
+			request_func = requests.post
+
+		if json is not None:
+			response = request_func(url, headers=headers, json=json) #type: ignore
+
+			if response.status_code == 401:
+				# Unauthorized. Refresh the token and try again.
+				self.auth.generate_access_token()
+				headers['Authorization'] = f'Bearer {self.auth.access_token}'  # Update the headers with the new token.
+				response = request_func(url, headers=headers, json=json) #type: ignore
+		else:
+			response = request_func(url, headers=headers) #type: ignore
+
+			if response.status_code == 401:
+				# Unauthorized. Refresh the token and try again.
+				self.auth.generate_access_token()
+				headers['Authorization'] = f'Bearer {self.auth.access_token}'  # Update the headers with the new token.
+				response = request_func(url, headers=headers) #type: ignore
+		return response
+	
 	def get_services_all(self, save=False, file=None):
 		headers = {
 			'Content-Type': 'application/json',
@@ -113,7 +134,7 @@ class SetmoreServices:
 		}
 
 		try:
-			services_response = requests.get('https://developer.setmore.com/api/v1/bookingapi/services', headers=headers)
+			services_response = self.make_request(self, 'https://developer.setmore.com/api/v1/bookingapi/services', headers, 'get')
 			services_response.raise_for_status()
 			data = services_response.json()
 			services = data['data']['services']
@@ -149,6 +170,38 @@ class SetmoreServices:
 class SetmoreStaff:
 	def __init__(self, auth):
 		self.auth = auth
+		self.make_request = self.make_request
+
+	def make_request(self, url, headers, method, json=None):
+		""" Make a request
+		``url (required, str)`` url
+		``headers (required, str)`` headers in a json string
+		``method (required, str)`` get or post
+		``payload (optional, str)`` payload in a json string
+		"""
+		# Depending on the HTTP method (get, post, etc.), we may need to handle data differently.
+		if method.lower() == 'get':
+			request_func = requests.get
+		elif method.lower() == 'post':
+			request_func = requests.post
+
+		if json is not None:
+			response = request_func(url, headers=headers, json=json) #type: ignore
+
+			if response.status_code == 401:
+				# Unauthorized. Refresh the token and try again.
+				self.auth.generate_access_token()
+				headers['Authorization'] = f'Bearer {self.auth.access_token}'  # Update the headers with the new token.
+				response = request_func(url, headers=headers, json=json) #type: ignore
+		else:
+			response = request_func(url, headers=headers) #type: ignore
+
+			if response.status_code == 401:
+				# Unauthorized. Refresh the token and try again.
+				self.auth.generate_access_token()
+				headers['Authorization'] = f'Bearer {self.auth.access_token}'  # Update the headers with the new token.
+				response = request_func(url, headers=headers) #type: ignore
+		return response
 
 	def get_all_staff(self, save=False, file='credentials/staff.json'):
 		headers = {
@@ -157,7 +210,7 @@ class SetmoreStaff:
 		}
 
 		try:
-			response = requests.get('https://developer.setmore.com/api/v1/bookingapi/staffs', headers=headers)
+			response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/staffs', headers=headers, method='get')
 			response.raise_for_status()
 			data = response.json()
 			staff = data['data']['staffs']
@@ -180,27 +233,73 @@ class SetmoreStaff:
 			print(f'Staff data saved to {file}')
 		except Exception as e:
 			print(f'Failed to save staff data: {str(e)}')
-	
 
 class SetmoreTimeSlots:
 	def __init__(self, auth):
 		self.auth = auth
+		self.make_request = self.make_request
 
-	def get_all_available_time_slots(self, service_name=None, staff_key=None, service_key=None, selected_date=None, off_hours=False, double_booking=False, slot_limit=None, timezone=None):
+	def make_request(self, url, headers, method, json=None):
+		""" Make a request
+		``url (required, str)`` url
+		``headers (required, str)`` headers in a json string
+		``method (required, str)`` get or post
+		``payload (optional, str)`` payload in a json string
+		"""
+		# Depending on the HTTP method (get, post, etc.), we may need to handle data differently.
+		if method.lower() == 'get':
+			request_func = requests.get
+		elif method.lower() == 'post':
+			request_func = requests.post
+
+		if json is not None:
+			response = request_func(url, headers=headers, json=json) #type: ignore
+
+			if response.status_code == 401:
+				# Unauthorized. Refresh the token and try again.
+				self.auth.generate_access_token()
+				headers['Authorization'] = f'Bearer {self.auth.access_token}'  # Update the headers with the new token.
+				response = request_func(url, headers=headers, json=json) #type: ignore
+		else:
+			response = request_func(url, headers=headers) #type: ignore
+
+			if response.status_code == 401:
+				# Unauthorized. Refresh the token and try again.
+				self.auth.generate_access_token()
+				headers['Authorization'] = f'Bearer {self.auth.access_token}'  # Update the headers with the new token.
+				response = request_func(url, headers=headers) #type: ignore
+		return response
+
+	def get_all_available_time_slots(self, service_name=None, staff_key=None, service_key=None, selected_date=None, off_hours=False, double_booking=False, slot_limit=None, timezone=None, past=False):
 		"""
 		Get all available time slots for the given service, staff, and date.
 
-		:param service_name (required, str): The name of the service. Default is to None. (optional if service_key is provided)
-		:param staff_key (optional, str): The key of the staff_key of the given staff_member. Default is to pull the first staff_key from the services.json file if it exists.
-		:param service_key (optional, str): The key of the service. Default is None. Required if service_name is not provided
-		:param selected_date ("DD/MM/YYYY", optional): The selected date in "DD/MM/YYYY" format. Default is today's date.
-		:param off_hours (optional, bool): A boolean indicating whether to include off-hours slots. Default is False.
-		:param double_booking (optional, bool): A boolean indicating whether to allow double booking. Default is False.
-		:param slot_limit (optional, int): The maximum number of slots to retrieve. Default is None.
-		:param timezone: The timezone for the slots. Default is None.
+		Parameters
+		----------
+		``service_name (str, required)``: The name of the service. Default is to None. (optional if service_key is provided)
 
-		:return: A list of available time slots.
+		``staff_key (str, optional)``: The key of the staff_key of the given staff_member. Default is to pull the first staff_key from the services.json file if it exists.
+
+		``service_key (str, optional)``: The key of the service. Default is None. Required if service_name is not provided.
+
+		``selected_date (str, optional)``: The selected date in "DD/MM/YYYY" format. Default is today's date.
+
+		``off_hours (bool, optional)``: A boolean indicating whether to include off-hours slots. Default is False.
+
+		``double_booking (bool, optional)``: A boolean indicating whether to allow double booking. Default is False.
+
+		``slot_limit (int, optional)``: The maximum number of slots to retrieve. Default is None.
+
+		``timezone (str, optional)``: The timezone for the slots. Default is None.
+
+		``past (bool, required)``: Show time slots that are in the past. Default is None.
+
+		Returns
+		-------
+		A list of available time slots.
+		:rtype: list
 		"""
+
 		headers = {
 			'Content-Type': 'application/json',
 			'Authorization': f'Bearer {self.auth.access_token}'
@@ -238,26 +337,60 @@ class SetmoreTimeSlots:
 			}.items()
 			if value is not None
 		}
-
+		selected_date = datetime.strptime(selected_date, '%d/%m/%Y')
 		try:
-			response = requests.post('https://developer.setmore.com/api/v1/bookingapi/slots', headers=headers, json=payload)
+			response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/slots', headers, 'post', json=payload)
 			response.raise_for_status()
 			data = response.json()
 			time_slots = data['data'].get('slots')
-			
-			if time_slots is not None:
-				return time_slots
+
+			dt_time_slots = [selected_date + timedelta(hours=int(time.split('.')[0]), minutes=int(time.split('.')[1]))
+			for time in time_slots
+			if past or (selected_date + timedelta(hours=int(time.split('.')[0]), minutes=int(time.split('.')[1]))) >= datetime.now()]
+			dt_str_time_slots = [dt_str.strftime("%Y/%m/%d %H:%M:%S %p").lower() for dt_str in dt_time_slots]
+
+			return dt_str_time_slots
+
 
 		except requests.exceptions.RequestException as e:
 			print(f'Request failed: {e}')
 
 		return None
-	
-import requests
 
 class SetmoreCustomers:
 	def __init__(self, auth):
 		self.auth = auth
+
+	def make_request(self, url, headers, method, json=None):
+		""" Make a request
+		``url (required, str)`` url
+		``headers (required, str)`` headers in a json string
+		``method (required, str)`` get or post
+		``payload (optional, str)`` payload in a json string
+		"""
+		# Depending on the HTTP method (get, post, etc.), we may need to handle data differently.
+		if method.lower() == 'get':
+			request_func = requests.get
+		elif method.lower() == 'post':
+			request_func = requests.post
+
+		if json is not None:
+			response = request_func(url, headers=headers, json=json) #type: ignore
+
+			if response.status_code == 401:
+				# Unauthorized. Refresh the token and try again.
+				self.auth.generate_access_token()
+				headers['Authorization'] = f'Bearer {self.auth.access_token}'  # Update the headers with the new token.
+				response = request_func(url, headers=headers, json=json) #type: ignore
+		else:
+			response = request_func(url, headers=headers) #type: ignore
+
+			if response.status_code == 401:
+				# Unauthorized. Refresh the token and try again.
+				self.auth.generate_access_token()
+				headers['Authorization'] = f'Bearer {self.auth.access_token}'  # Update the headers with the new token.
+				response = request_func(url, headers=headers) #type: ignore
+		return response
 
 	def create_customer(self, customer_data):
 		"""
@@ -288,7 +421,7 @@ class SetmoreCustomers:
 		}
 
 		try:
-			response = requests.post('https://developer.setmore.com/api/v1/bookingapi/customer/create', headers=headers, json=customer_data)
+			response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/customer/create', headers, 'post', json=customer_data)
 			response.raise_for_status()
 			data = response.json()
 			customer_id = data.get('data', {}).get('customer', {}).get('key')
@@ -312,14 +445,14 @@ class SetmoreCustomers:
 			'Authorization': f'Bearer {self.auth.access_token}'
 		}
 		
-		params = {
+		payload = {
 			'firstname': firstname,
 			'email': email,
 			'phone': phone
 		}
 
 		try:
-			response = requests.get('https://developer.setmore.com/api/v1/bookingapi/customer', headers=headers, params=params)
+			response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/customer', headers, 'get', json=payload)
 			response.raise_for_status()
 			data = response.json()
 			customer_details = data.get('data', {}).get('customer')
@@ -328,10 +461,41 @@ class SetmoreCustomers:
 			print(f'Request failed: {e}')
 
 		return None
-
 class SetmoreAppointments:
 	def __init__(self, auth):
 		self.auth = auth
+		self.make_request = self.make_request
+
+	def make_request(self, url, headers, method, json=None):
+		""" Make a request
+		``url (required, str)`` url
+		``headers (required, str)`` headers in a json string
+		``method (required, str)`` get or post
+		``payload (optional, str)`` payload in a json string
+		"""
+		# Depending on the HTTP method (get, post, etc.), we may need to handle data differently.
+		if method.lower() == 'get':
+			request_func = requests.get
+		elif method.lower() == 'post':
+			request_func = requests.post
+
+		if json is not None:
+			response = request_func(url, headers=headers, json=json) #type: ignore
+
+			if response.status_code == 401:
+				# Unauthorized. Refresh the token and try again.
+				self.auth.generate_access_token()
+				headers['Authorization'] = f'Bearer {self.auth.access_token}'  # Update the headers with the new token.
+				response = request_func(url, headers=headers, json=json) #type: ignore
+		else:
+			response = request_func(url, headers=headers) #type: ignore
+
+			if response.status_code == 401:
+				# Unauthorized. Refresh the token and try again.
+				self.auth.generate_access_token()
+				headers['Authorization'] = f'Bearer {self.auth.access_token}'  # Update the headers with the new token.
+				response = request_func(url, headers=headers) #type: ignore
+		return response
 
 	def create_appointment(self, appointment_data):
 		headers = {
@@ -340,7 +504,7 @@ class SetmoreAppointments:
 		}
 
 		try:
-			response = requests.post('https://developer.setmore.com/api/v1/bookingapi/appointments', headers=headers, json=appointment_data)
+			response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/appointments', headers, 'post', json=appointment_data)
 			response.raise_for_status()
 			data = response.json()
 			appointment_id = data.get('data', {}).get('appointment_id')
@@ -350,6 +514,7 @@ class SetmoreAppointments:
 		
 		return None
 
+##### note to self... this requires method put so all make_request() functions need to be updated to include functionality for put####
 	def update_appointment_label(self, appointment_id, label):
 		headers = {
 			'Content-Type': 'application/json',
@@ -377,7 +542,7 @@ class SetmoreAppointments:
 		}
 
 		try:
-			response = requests.get('https://developer.setmore.com/api/v1/bookingapi/appointments', headers=headers)
+			response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/appointments', headers, 'get')
 			response.raise_for_status()
 			data = response.json()
 			appointments = data.get('data', [])
