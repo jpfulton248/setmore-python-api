@@ -14,6 +14,4 @@ url = "https://github.com/jpfulton248/setmore-python-api"
 packages = find:
 install_requires = [
     "requests",
-    "json",
-    "datetime",
 ]
