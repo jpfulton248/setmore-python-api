@@ -1,17 +1,55 @@
-[build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[metadata]
+[project]
 name = "setmore-python-api"
 version = "1.0.0"
-author = "Peter Fulton"
-author_email = "jpfulton248@gmail.com"
-description = "A description of your project"
-url = "https://github.com/jpfulton248/setmore-python-api"
-
-[options]
-packages = find:
-install_requires = [
-    "requests",
+description = "Unofficial python module for the Setmore API"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE.txt"}
+keywords = [
+	"API",
+	"Python",
+	"Integration",
+	"Setmore",
+	"Wrapper",
+	"Client",
+	"Library",
+	"REST",
+	"Scheduling",
+	"Booking",
+	"Calendar",
+	"Automation",
+	"Web Services",
+	"Third-party",
+	"Client-side",
+	"API client",
+	"Python client",
+	"Appointment management"
 ]
+
+authors = [
+	{name = "Peter Fulton", email = "jpfulton248@gmail.com"}
+]
+
+[project.urls]
+Homepage = "https://github.com/jpfulton248/setmore-python-api"
+Bug Reports = "https://github.com/jpfulton248/setmore-python-api/issues"
+
+classifiers = [
+	"Development Status :: 3 - Alpha",
+	"Intended Audience :: Developers",
+	"Topic :: Software Development :: Libraries",
+	"License :: OSI Approved :: MIT License",
+	"Programming Language :: Python :: 3",
+	"Programming Language :: Python :: 3.9",
+	"Programming Language :: Python :: 3.10",
+	"Programming Language :: Python :: 3.11",
+	"Programming Language :: Python :: 3 :: Only",
+]
+
+[project.optional-dependencies]
+
+[tool.setuptools]
+
+[build-system]
+requires = ["setuptools>=43.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
