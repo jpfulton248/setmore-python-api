@@ -2,38 +2,17 @@
 name = "setmore-python-api"
 version = "1.0.0"
 description = "Unofficial python module for the Setmore API"
-readme = "README.md"
-requires-python = ">=3.9"
 license = {file = "LICENSE.txt"}
-keywords = [
-	"API",
-	"Python",
-	"Integration",
-	"Setmore",
-	"Wrapper",
-	"Client",
-	"Library",
-	"REST",
-	"Scheduling",
-	"Booking",
-	"Calendar",
-	"Automation",
-	"Web Services",
-	"Third-party",
-	"Client-side",
-	"API client",
-	"Python client",
-	"Appointment management"
-]
-
+requires-python = ">=3.9"
+readme = "README.md"
 authors = [
 	{name = "Peter Fulton", email = "jpfulton248@gmail.com"}
 ]
 
-[project.urls]
-Homepage = "https://github.com/jpfulton248/setmore-python-api"
-Bug Reports = "https://github.com/jpfulton248/setmore-python-api/issues"
+dependencies = [
+	"requests>=2.3",
+]
 
-[build-system]
-requires = ["setuptools>=43.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
+[project.urls]
+"Homepage" = "https://github.com/jpfulton248/setmore-python-api"
+"Bug Reports" = "https://github.com/jpfulton248/setmore-python-api/issues"
