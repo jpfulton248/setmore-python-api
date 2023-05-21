@@ -134,7 +134,7 @@ class SetmoreServices:
 		}
 
 		try:
-			services_response = self.make_request(self, 'https://developer.setmore.com/api/v1/bookingapi/services', headers, 'get')
+			services_response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/services', headers, 'get')
 			services_response.raise_for_status()
 			data = services_response.json()
 			services = data['data']['services']
@@ -234,6 +234,12 @@ class SetmoreStaff:
 		except Exception as e:
 			print(f'Failed to save staff data: {str(e)}')
 
+def mdy_to_dmy(date_str):
+	return datetime.strftime(datetime.strptime(date_str, '%m/%d/%Y'), '%d/%m/%Y')
+
+def dmy_to_mdy(date_str):
+	return datetime.strftime(datetime.strptime(date_str, '%d/%m/%Y'), '%m/%d/%Y')
+
 class SetmoreTimeSlots:
 	def __init__(self, auth):
 		self.auth = auth
@@ -282,7 +288,7 @@ class SetmoreTimeSlots:
 
 		``service_key (str, optional)``: The key of the service. Default is None. Required if service_name is not provided.
 
-		``selected_date (str, optional)``: The selected date in "DD/MM/YYYY" format. Default is today's date.
+		``selected_date (str, optional)``: The selected date in "MM/DD/YYYY" format. Default is today's date.
 
 		``off_hours (bool, optional)``: A boolean indicating whether to include off-hours slots. Default is False.
 
@@ -323,6 +329,8 @@ class SetmoreTimeSlots:
 			raise Exception(error)
 		if selected_date is None:
 			selected_date = date.today().strftime("%d/%m/%Y")
+		else:
+			selected_date = mdy_to_dmy(selected_date)
 
 		payload = {
 			key: value
