@@ -24,8 +24,6 @@ class SetmoreAuth:
 		except FileNotFoundError:
 			self.generate_access_token()
 
-		self.verify_token()
-
 	def save_access_token(self, data):
 		try:
 			with open(self.access_token_file, 'w') as file:
@@ -80,9 +78,10 @@ class SetmoreAuth:
 			return None
 
 		elif services_response.status_code == 401:
-				self.generate_access_token()
+			self.generate_access_token()
 		else:
 			services_response.raise_for_status()
+
 class Setmore:
 	def __init__(self, auth):
 		self.auth = auth
@@ -91,6 +90,7 @@ class Setmore:
 		self.timeslots = SetmoreTimeSlots(self.auth)
 		self.customers = SetmoreCustomers(self.auth)
 		self.appointments = SetmoreAppointments(self.auth)
+
 class SetmoreServices:
 	def __init__(self, auth):
 		self.auth = auth
