@@ -17,11 +17,11 @@ class SetmoreAuth:
 
 	:param refresh_token_file: (optional) Defaults to refresh_token.json
 	:param access_token_file: (optional) Defaults to access_token.json
-	:param token_file_path: (optional) Location for token json files. Defaults to directory 'credentials' as a subdirectory of current directory.
+	:param token_file_path: (optional) Location for token json files. Defaults to directory 'credentials' as a subdirectory of current directory. If using flask you can use app.root_path as an alternative.
 	"""
 	def __init__(self, refresh_token_file='refresh_token.json', access_token_file='access_token.json',
 				 token_file_path='credentials'):
-		self.token_file_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), token_file_path)
+		self.token_file_path = os.path.join(os.path.dirname(__file__), token_file_path)
 		self.refresh_token_file = os.path.join(self.token_file_path, refresh_token_file)
 		self.access_token_file = os.path.join(self.token_file_path, access_token_file)
 		self.refresh_token = None
@@ -162,11 +162,9 @@ class SetmoreServices:
 
 	def save_services_data(self, services, file=None):
 		if file:
-			if not os.path.isabs(file):
-				default_path = os.path.join(self.auth.token_file_path, file)
-				file = os.path.abspath(default_path)
+			file = os.path.join(self.auth.token_file_path, file)
 		else:
-			file = os.path.abspath(os.path.join(self.auth.token_file_path, 'services.json'))
+			file = os.path.join(self.auth.token_file_path, 'services.json')
 
 		try:
 			with open(file, 'w') as f:
@@ -236,11 +234,9 @@ class SetmoreStaff:
 
 	def save_staff_data(self, staff, file):
 		if file:
-			if not os.path.isabs(file):
-				default_path = os.path.join(self.auth.token_file_path, file)
-				file = os.path.abspath(default_path)
+			file = os.path.join(self.auth.token_file_path, file)
 		else:
-			file = os.path.abspath(os.path.join(self.auth.token_file_path, 'staff.json'))
+			file = os.path.join(self.auth.token_file_path, 'staff.json')
 
 		try:
 			with open(file, 'w') as f:
