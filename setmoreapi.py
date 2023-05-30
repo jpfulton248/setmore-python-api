@@ -5,6 +5,12 @@ import os
 from datetime import date, timedelta, datetime
 import time
 
+import os
+import json
+import requests
+import time
+
+
 class SetmoreAuth:
 	"""
 	Initializes SetmoreApi with necessary tokens
@@ -13,23 +19,28 @@ class SetmoreAuth:
 	:param access_token_file: (optional) Defaults to access_token.json
 	:param token_file_path: (optional) Location for token json files. Defaults to directory 'credentials' as a subdirectory of current directory.
 	"""
-	def __init__(self, refresh_token_file='refresh_token.json', access_token_file='access_token.json', token_file_path = 'credentials'):
+	def __init__(self, refresh_token_file='refresh_token.json', access_token_file='access_token.json',
+				 token_file_path='credentials'):
 		self.token_file_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), token_file_path)
 		self.refresh_token_file = os.path.join(self.token_file_path, refresh_token_file)
 		self.access_token_file = os.path.join(self.token_file_path, access_token_file)
 		self.refresh_token = None
 		self.access_token = None
-		self.token_path = None
-		
+
+		try:
+			self.load_refresh_token()  # Retrieve refresh token before attempting to generate or load access token
+		except FileNotFoundError:
+			raise FileNotFoundError("Could not load refresh token")
+
 		try:
 			if os.path.isfile(self.access_token_file):
 				with open(self.access_token_file, 'r') as file:
 					json_data = file.read()
 					data = json.loads(json_data)
-					
+
 					expiration_time = data['data']['token']['expires']
 					current_time = int(time.time())
-					
+
 					if expiration_time - current_time <= 4 * 3600:  # 4 hours in seconds
 						self.generate_access_token()
 		except FileNotFoundError:
@@ -45,7 +56,7 @@ class SetmoreAuth:
 			with open(self.access_token_file, 'w') as file:
 				json.dump(data, file)
 		except FileNotFoundError:
-			os.error("Error on write access_token_file. File or file path not found")
+			raise FileNotFoundError("Error on write access_token_file. File or file path not found")
 
 	def generate_access_token(self):
 		response = requests.get(f'https://developer.setmore.com/api/v1/o/oauth2/token?refreshToken={self.refresh_token}')
@@ -60,19 +71,24 @@ class SetmoreAuth:
 		else:
 			raise Exception(f'Access token generation failed with status code: {response.status_code}\n{response.text}')
 
-	def load_token(self, token_file, token_key):
-		with open(token_file, 'r') as file:
-			data = json.load(file)
-		return data[token_key]
-
 	def load_refresh_token(self):
-		self.refresh_token = self.load_token(self.refresh_token_file, 'refresh_token')
+		try:
+			with open(self.refresh_token_file, 'r') as file:
+				data = json.load(file)
+			self.refresh_token = data['refresh_token']
+		except FileNotFoundError:
+			self.refresh_token = None
+			raise FileNotFoundError("Refresh token file not found")
 
 	def load_access_token(self):
 		try:
-			self.access_token = self.load_token(self.access_token_file, 'data')['token']['access_token']
+			with open(self.access_token_file, 'r') as file:
+				data = json.load(file)
+			self.access_token = data['data']['token']['access_token']
 		except FileNotFoundError:
 			self.access_token = None
+			raise FileNotFoundError("Access token file not found")
+
 
 class Setmore:
 	def __init__(self, auth):
@@ -468,6 +484,7 @@ class SetmoreCustomers:
 			print(f'Request failed: {e}')
 
 		return None
+	
 class SetmoreAppointments:
 	def __init__(self, auth):
 		self.auth = auth
