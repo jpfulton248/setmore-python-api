@@ -21,7 +21,7 @@ class SetmoreAuth:
 	"""
 	def __init__(self, refresh_token_file='refresh_token.json', access_token_file='access_token.json',
 				 token_file_path='credentials'):
-		self.token_file_path = os.path.join(os.path.dirname(__file__), token_file_path)
+		self.token_file_path = os.path.join(os.getcwd(), token_file_path)
 		self.refresh_token_file = os.path.join(self.token_file_path, refresh_token_file)
 		self.access_token_file = os.path.join(self.token_file_path, access_token_file)
 		self.refresh_token = None
