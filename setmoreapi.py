@@ -3,6 +3,7 @@ import requests
 import json
 import os
 from datetime import date, timedelta, datetime
+import time
 
 class SetmoreAuth:
 	"""
@@ -18,6 +19,20 @@ class SetmoreAuth:
 		self.refresh_token = None
 		self.access_token = None
 		self.token_path = None
+
+		try:
+			if os.path.isfile(access_token_file):
+				with open(access_token_file, 'r') as file:
+					json_data = file.read()
+					data = json.loads(json_data)
+					
+					expiration_time = data['data']['token']['expires']
+					current_time = int(time.time())
+					
+					if expiration_time - current_time <= 4 * 3600:  # 4 hours in seconds
+						self.generate_access_token()
+		except FileNotFoundError:
+			self.generate_access_token()
 
 		try:
 			self.load_access_token()
@@ -57,30 +72,6 @@ class SetmoreAuth:
 			self.access_token = self.load_token(self.access_token_file, 'data')['token']['access_token']
 		except FileNotFoundError:
 			self.access_token = None
-
-	def verify_token(self):
-		self.load_refresh_token()
-
-		if self.access_token is None:
-			self.generate_access_token()
-			self.access_token = self.load_access_token()
-			return self.access_token
-
-		headers = {
-			'Content-Type': 'application/json',
-			'Authorization': f'Bearer {self.access_token}'
-		}
-
-		services_response = requests.get('https://developer.setmore.com/api/v1/bookingapi/services', headers=headers)
-
-		if services_response.status_code == 200:
-			# Success: Access token is valid
-			return None
-
-		elif services_response.status_code == 401:
-			self.generate_access_token()
-		else:
-			services_response.raise_for_status()
 
 class Setmore:
 	def __init__(self, auth):
