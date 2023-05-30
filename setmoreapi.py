@@ -22,8 +22,8 @@ class SetmoreAuth:
 		self.token_path = None
 		
 		try:
-			if os.path.isfile(access_token_file):
-				with open(access_token_file, 'r') as file:
+			if os.path.isfile(self.access_token_file):
+				with open(self.access_token_file, 'r') as file:
 					json_data = file.read()
 					data = json.loads(json_data)
 					
@@ -147,10 +147,10 @@ class SetmoreServices:
 	def save_services_data(self, services, file=None):
 		if file:
 			if not os.path.isabs(file):
-				default_path = os.path.join('credentials', file)
+				default_path = os.path.join(self.auth.token_file_path, file)
 				file = os.path.abspath(default_path)
 		else:
-			file = os.path.abspath(os.path.join('credentials', 'services.json'))
+			file = os.path.abspath(os.path.join(self.auth.token_file_path, 'services.json'))
 
 		try:
 			with open(file, 'w') as f:
@@ -195,7 +195,7 @@ class SetmoreStaff:
 				response = request_func(url, headers=headers) #type: ignore
 		return response
 
-	def get_all_staff(self, save=False, file='credentials/staff.json'):
+	def get_all_staff(self, save=False, file=None):
 		headers = {
 			'Content-Type': 'application/json',
 			'Authorization': f'Bearer {self.auth.access_token}'
@@ -219,6 +219,13 @@ class SetmoreStaff:
 		return None
 
 	def save_staff_data(self, staff, file):
+		if file:
+			if not os.path.isabs(file):
+				default_path = os.path.join(self.auth.token_file_path, file)
+				file = os.path.abspath(default_path)
+		else:
+			file = os.path.abspath(os.path.join(self.auth.token_file_path, 'staff.json'))
+
 		try:
 			with open(file, 'w') as f:
 				json.dump(staff, f, indent=4)
@@ -302,8 +309,8 @@ class SetmoreTimeSlots:
 			'Content-Type': 'application/json',
 			'Authorization': f'Bearer {self.auth.access_token}'
 		}
-		if os.path.isfile('credentials/services.json'):
-			with open("credentials/services.json") as file:
+		if os.path.isfile(os.path.join(self.auth.token_file_path, 'services.json')):
+			with open(os.path.join(self.auth.token_file_path, 'services.json')) as file:
 				data = json.load(file)
 				if staff_key is None:
 					for service in data:
