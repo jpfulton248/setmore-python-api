@@ -1,6 +1,6 @@
 [project]
 name = "setmore-python-api"
-version = "1.0.0"
+version = "1.0.2"
 description = "Unofficial python module for the Setmore API"
 license = {file = "LICENSE.txt"}
 requires-python = ">=3.9"
