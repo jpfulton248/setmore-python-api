@@ -13,13 +13,14 @@ class SetmoreAuth:
 	:param access_token_file: (optional) Defaults to access_token.json
 	:param token_file_path: (optional) Location for token json files. Defaults to directory 'credentials' as a subdirectory of current directory.
 	"""
-	def __init__(self, refresh_token_file='refresh_token.json', access_token_file='access_token.json', token_file_path='credentials'):
-		self.refresh_token_file = os.path.join(token_file_path, refresh_token_file)
-		self.access_token_file = os.path.join(token_file_path, access_token_file)
+	def __init__(self, refresh_token_file='refresh_token.json', access_token_file='access_token.json', token_file_path = 'credentials'):
+		self.token_file_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), token_file_path)
+		self.refresh_token_file = os.path.join(self.token_file_path, refresh_token_file)
+		self.access_token_file = os.path.join(self.token_file_path, access_token_file)
 		self.refresh_token = None
 		self.access_token = None
 		self.token_path = None
-
+		
 		try:
 			if os.path.isfile(access_token_file):
 				with open(access_token_file, 'r') as file:
