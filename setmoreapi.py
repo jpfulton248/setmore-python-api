@@ -20,7 +20,7 @@ class SetmoreAuth:
 	:param token_file_path: (optional) Location for token json files. Defaults to directory 'credentials' as a subdirectory of current directory. If using flask you can use app.root_path as an alternative.
 	"""
 	def __init__(self, refresh_token_file='refresh_token.json', access_token_file='access_token.json',
-				 token_file_path='credentials'):
+		token_file_path='credentials'):
 		self.token_file_path = os.path.join(os.getcwd(), token_file_path)
 		self.refresh_token_file = os.path.join(self.token_file_path, refresh_token_file)
 		self.access_token_file = os.path.join(self.token_file_path, access_token_file)
@@ -37,11 +37,19 @@ class SetmoreAuth:
 				with open(self.access_token_file, 'r') as file:
 					json_data = file.read()
 					data = json.loads(json_data)
-
+					
 					expiration_time = data['data']['token']['expires']
-					current_time = int(time.time())
+					timestamp_seconds = expiration_time / 1000
+					expiration = datetime.utcfromtimestamp(timestamp_seconds)
 
-					if expiration_time - current_time <= 4 * 3600:  # 4 hours in seconds
+					current_time = datetime.utcnow()
+
+					# Calculate the time difference in hours
+					time_difference_minutes = (expiration - current_time).total_seconds() / 60
+					# 4 hours in seconds
+
+					if (time_difference_minutes <= 30):
+						print("Access token expired. Generating new access token")
 						self.generate_access_token()
 		except FileNotFoundError:
 			self.generate_access_token()
