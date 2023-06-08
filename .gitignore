@@ -1,8 +1,14 @@
 __pycache__
+setmore/__pycache__
+setmore/.DS_STORE
 .DS_STORE
 DS_STORE
-app.py
+setmore/app.py
+setmore/test.py
+setmore/credentials
 credentials/
 /credentials
 .env
+setmore/.env
+setmore/.vscode
 .vscode
