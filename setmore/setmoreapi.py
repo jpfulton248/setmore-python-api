@@ -497,7 +497,10 @@ class SetmoreCustomers:
 				for customer in customer_details
 			]
 
-			return extracted_data
+			json_data = json.dumps(extracted_data)
+			
+			return json_data
+		
 		except requests.exceptions.RequestException as e:
 			print(f'Request failed: {e}')
 
@@ -580,7 +583,7 @@ class SetmoreAppointments:
 		end_time_formatted = end_datetime.strftime("%Y-%m-%dT%H:%M")
 
 		appointment_data = {
-			"staff_key": staff_key + '-d',
+			"staff_key": staff_key + ,
 			"service_key": service_key,
 			"customer_key": customer_key,
 			"start_time": start_time_formatted,
@@ -590,7 +593,7 @@ class SetmoreAppointments:
 		response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/appointment/create', headers, 'post', json=appointment_data)
 		response.raise_for_status()
 		data = response.json()
-		print(data)
+		return(data)
 
 
 ##### note to self... this requires method put so all make_request() functions need to be updated to include functionality for put####
