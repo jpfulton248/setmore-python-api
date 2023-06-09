@@ -4,11 +4,7 @@ import json
 import os
 from datetime import date, timedelta, datetime
 import time
-
-import os
-import json
-import requests
-import time
+import urllib.parse
 
 
 class SetmoreAuth:
@@ -388,7 +384,7 @@ class SetmoreCustomers:
 	def __init__(self, auth):
 		self.auth = auth
 
-	def make_request(self, url, headers, method, json=None):
+	def make_request(self, url, headers, method, json=None,  params=None):
 		""" Make a request
 		``url (required, str)`` url
 		``headers (required, str)`` headers in a json string
@@ -396,6 +392,10 @@ class SetmoreCustomers:
 		``payload (optional, str)`` payload in a json string
 		"""
 		# Depending on the HTTP method (get, post, etc.), we may need to handle data differently.
+		
+		if params:
+			query_params = urllib.parse.urlencode(params)
+			url += '?' + query_params
 		if method.lower() == 'get':
 			request_func = requests.get
 		elif method.lower() == 'post':
@@ -411,7 +411,6 @@ class SetmoreCustomers:
 				response = request_func(url, headers=headers, json=json) #type: ignore
 		else:
 			response = request_func(url, headers=headers) #type: ignore
-
 			if response.status_code == 401:
 				# Unauthorized. Refresh the token and try again.
 				self.auth.generate_access_token()
@@ -461,7 +460,7 @@ class SetmoreCustomers:
 	def get_customer_details(self, firstname=None, email=None, phone=None):
 		"""
 		Retrieve customer details from Setmore.
-
+		:example: get_customer_details(firstname='John')
 		:param firstname: The customer's first name (required).
 		:param email: The customer's email address.
 		:param phone: The customer's phone number.
@@ -471,19 +470,34 @@ class SetmoreCustomers:
 			'Content-Type': 'application/json',
 			'Authorization': f'Bearer {self.auth.access_token}'
 		}
-		
-		payload = {
-			'firstname': firstname,
-			'email': email,
-			'phone': phone
-		}
 
+		params = {
+			'firstname': firstname
+			}
+
+		if email:
+			params['email'] = email
+
+		if phone:
+			params['phone'] = phone
+		
 		try:
-			response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/customer', headers, 'get', json=payload)
+			response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/customer', headers, 'get', params=params)
 			response.raise_for_status()
 			data = response.json()
 			customer_details = data.get('data', {}).get('customer')
-			return customer_details
+			
+			extracted_data = [
+				{
+					'key': customer.get('key'),
+					'first_name': customer.get('first_name'),
+					'last_name': customer.get('last_name'),
+					'cell_phone': customer.get('cell_phone')
+				}
+				for customer in customer_details
+			]
+
+			return extracted_data
 		except requests.exceptions.RequestException as e:
 			print(f'Request failed: {e}')
 
