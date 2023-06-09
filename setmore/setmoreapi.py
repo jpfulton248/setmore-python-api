@@ -6,7 +6,6 @@ from datetime import date, timedelta, datetime
 import time
 import urllib.parse
 
-
 class SetmoreAuth:
 	"""
 	Initializes SetmoreApi with necessary tokens
@@ -498,8 +497,8 @@ class SetmoreCustomers:
 			]
 
 			json_data = json.dumps(extracted_data)
-
-			return json_data
+			
+			return json_data, {'Content-Type': 'application/json'}
 		
 		except requests.exceptions.RequestException as e:
 			print(f'Request failed: {e}')
