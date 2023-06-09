@@ -539,22 +539,59 @@ class SetmoreAppointments:
 				response = request_func(url, headers=headers) #type: ignore
 		return response
 
-	def create_appointment(self, appointment_data):
+	def create_appointment(self, staff_key=None, service_name=None, customer_key=None, start_time=None):
+		"""
+		Create an appointment
+		:param staff_key: The staff key. Defaults to the first staff key in the services.json file.
+		:param service_name (required): The service name.
+		:param customer_key (required): The customer key.
+		:param start_time (required): The start time of the appointment. Formatted like '2019-01-01 00:00'.
+		"""
+
 		headers = {
 			'Content-Type': 'application/json',
 			'Authorization': f'Bearer {self.auth.access_token}'
 		}
 
-		try:
-			response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/appointments', headers, 'post', json=appointment_data)
-			response.raise_for_status()
-			data = response.json()
-			appointment_id = data.get('data', {}).get('appointment_id')
-			return appointment_id
-		except requests.exceptions.RequestException as e:
-			print(f'Request failed: {e}')
-		
-		return None
+		# Check if staff_key and/or service_key are not provided
+		if os.path.isfile(os.path.join(self.auth.token_file_path, 'services.json')):
+			with open(os.path.join(self.auth.token_file_path, 'services.json')) as file:
+				data = json.load(file)
+				for service in data:
+					if service["service_name"] == service_name:
+						service_key = service["key"]
+
+		# Derive duration from the service
+		if service_name == "30 Minutes":
+			duration = timedelta(minutes=30)
+		elif service_name == "60 Minutes":
+			duration = timedelta(minutes=60)
+		else:
+			raise ValueError("Invalid service duration")
+
+		# Convert start time to datetime object
+		start_datetime = datetime.strptime(start_time, "%Y-%m-%d %H:%M")
+
+		# Calculate end time by adding duration to start time
+		end_datetime = start_datetime + duration
+
+		# Format start time and end time for API call
+		start_time_formatted = start_datetime.strftime("%Y-%m-%dT%H:%M")
+		end_time_formatted = end_datetime.strftime("%Y-%m-%dT%H:%M")
+
+		appointment_data = {
+			"staff_key": staff_key + '-d',
+			"service_key": service_key,
+			"customer_key": customer_key,
+			"start_time": start_time_formatted,
+			"end_time": end_time_formatted
+		}
+
+		response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/appointment/create', headers, 'post', json=appointment_data)
+		response.raise_for_status()
+		data = response.json()
+		print(data)
+
 
 ##### note to self... this requires method put so all make_request() functions need to be updated to include functionality for put####
 	def update_appointment_label(self, appointment_id, label):
