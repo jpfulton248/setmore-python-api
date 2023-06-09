@@ -498,7 +498,7 @@ class SetmoreCustomers:
 			]
 
 			json_data = json.dumps(extracted_data)
-			
+
 			return json_data
 		
 		except requests.exceptions.RequestException as e:
@@ -583,7 +583,7 @@ class SetmoreAppointments:
 		end_time_formatted = end_datetime.strftime("%Y-%m-%dT%H:%M")
 
 		appointment_data = {
-			"staff_key": staff_key + ,
+			"staff_key": staff_key + '-d',
 			"service_key": service_key,
 			"customer_key": customer_key,
 			"start_time": start_time_formatted,
