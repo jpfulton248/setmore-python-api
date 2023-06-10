@@ -496,9 +496,7 @@ class SetmoreCustomers:
 				for customer in customer_details
 			]
 
-			json_data = json.dumps(extracted_data)
-			
-			return json_data, {'Content-Type': 'application/json'}
+			return extracted_data
 		
 		except requests.exceptions.RequestException as e:
 			print(f'Request failed: {e}')
@@ -541,7 +539,7 @@ class SetmoreAppointments:
 				response = request_func(url, headers=headers) #type: ignore
 		return response
 
-	def create_appointment(self, staff_key=None, service_name=None, customer_key=None, start_time=None):
+	def create_appointment(self, staff_key=None, service_name=None, customer_key=None, start_time=None, end_time=None):
 		"""
 		Create an appointment
 		:param staff_key: The staff key. Defaults to the first staff key in the services.json file.
@@ -555,45 +553,49 @@ class SetmoreAppointments:
 			'Authorization': f'Bearer {self.auth.access_token}'
 		}
 
+		selected_service_name = service_name
+		service_name = ''
+
 		# Check if staff_key and/or service_key are not provided
 		if os.path.isfile(os.path.join(self.auth.token_file_path, 'services.json')):
 			with open(os.path.join(self.auth.token_file_path, 'services.json')) as file:
 				data = json.load(file)
 				for service in data:
-					if service["service_name"] == service_name:
+					if service["service_name"] == selected_service_name:
+						service_name = service["service_name"]
 						service_key = service["key"]
-
-		# Derive duration from the service
-		if service_name == "30 Minutes":
-			duration = timedelta(minutes=30)
-		elif service_name == "60 Minutes":
-			duration = timedelta(minutes=60)
+						if staff_key is None and service["staff_keys"]:
+							staff_key = service["staff_keys"][0]
+						break  # Exit the loop after finding the first match
 		else:
-			raise ValueError("Invalid service duration")
-
+			raise Exception('services.json file not found so no service_key or staff_key can be derived')
+		
 		# Convert start time to datetime object
 		start_datetime = datetime.strptime(start_time, "%Y-%m-%d %H:%M")
-
-		# Calculate end time by adding duration to start time
-		end_datetime = start_datetime + duration
+		end_datetime = datetime.strptime(end_time, "%Y-%m-%d %H:%M")
 
 		# Format start time and end time for API call
 		start_time_formatted = start_datetime.strftime("%Y-%m-%dT%H:%M")
 		end_time_formatted = end_datetime.strftime("%Y-%m-%dT%H:%M")
 
 		appointment_data = {
-			"staff_key": staff_key + '-d',
+			"staff_key": staff_key,
 			"service_key": service_key,
 			"customer_key": customer_key,
 			"start_time": start_time_formatted,
 			"end_time": end_time_formatted
 		}
-
+			
 		response = self.make_request('https://developer.setmore.com/api/v1/bookingapi/appointment/create', headers, 'post', json=appointment_data)
+		if response.status_code == 200:
+			data = response.json()
+			if data.get('msg') == "Appointment created successfully":
+				return jsonify(data, response.status_code)
+			else:
+				return jsonify(data, response.status_code)
 		response.raise_for_status()
 		data = response.json()
-		return(data)
-
+		return jsonify(data, response.status_code)
 
 ##### note to self... this requires method put so all make_request() functions need to be updated to include functionality for put####
 	def update_appointment_label(self, appointment_id, label):
@@ -629,6 +631,24 @@ class SetmoreAppointments:
 			appointments = data.get('data', [])
 			return appointments
 		except requests.exceptions.RequestException as e:
-			print(f'Request failed: {e}')
-		
+			print(f'Request failed: {e}')	
 		return None
+	
+def jsonify(data, status_code=200):
+    '''
+	Returns a fake JSONified response
+	Example use:
+	jsonify({'first_name': first_name, 'last_name': 'last_name'}, 200)
+	or
+	jsonify({'success': 'Request was succesful'}, 200)
+	or
+	jsonify({'error': 'Invalid request'}, 400)
+	or
+	jsonify({'error': 'Invalid request'}, 404)
+	or
+	jsonify({'error': 'Invalid request'}, 500)
+	or
+	jsonify({'error': 'Invalid request'}, 502)
+	'''
+    json_data = json.dumps(data)
+    return json_data, status_code
